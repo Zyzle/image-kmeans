@@ -1,6 +1,6 @@
 [package]
 name = "image-kmeans"
-version = "1.0.0"
+version = "1.0.1"
 authors = ["Colin McCulloch <colin@zyzle.dev>"]
 edition = "2021"
 description = "A WebAssembly module providing k-means clustering calculation for JS canvas images"
