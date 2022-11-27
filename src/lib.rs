@@ -124,16 +124,15 @@ impl ImageKmeans {
         }
 
         let points: Vec<(f32, f32)> = self.results.iter().map(|p| (p.ks as f32, p.sum)).collect();
-        let b = self.calc_euclidean_dist_2d(&points[0], &points[points.len() - 1]) as f64 / 100.0;
+        let b = self.calc_euclidean_dist_2d(&points[0], &points[points.len() - 1]) as f64;
         let mut hs = vec![];
         // for each point in points:
         for (i, ps) in points.iter().enumerate() {
             if i == 0 || i == (points.len() - 1) {
                 hs.push((0, 0.0));
             } else {
-                let a: f64 = self.calc_euclidean_dist_2d(&points[0], &ps) as f64 / 100.0;
-                let c: f64 =
-                    self.calc_euclidean_dist_2d(&ps, &points[points.len() - 1]) as f64 / 100.0;
+                let a: f64 = self.calc_euclidean_dist_2d(&points[0], &ps) as f64;
+                let c: f64 = self.calc_euclidean_dist_2d(&ps, &points[points.len() - 1]) as f64;
                 let p: f64 = (a + b + c) as f64;
                 let s = p / 2.0_f64;
                 let t = f64::sqrt(s * ((s - a) * (s - b) * (s - c)));
