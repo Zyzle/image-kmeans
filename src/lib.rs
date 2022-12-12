@@ -6,7 +6,7 @@ use rand::seq::IteratorRandom;
 use serde_derive::{Deserialize, Serialize};
 use utils::set_panic_hook;
 use wasm_bindgen::prelude::*;
-use web_sys::{console, CanvasRenderingContext2d};
+use web_sys::CanvasRenderingContext2d;
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
@@ -29,7 +29,7 @@ pub struct Color {
 struct RunResult {
     ks: usize,
     clusters: Vec<Color>,
-    sum: f32,
+    wcss: f32,
 }
 
 /// Represents the instance of the module containing the current images
@@ -73,7 +73,7 @@ impl ImageKmeans {
             });
         }
 
-        let colors: Vec<Color> = pixels.into_iter().duplicates().collect();
+        let colors: Vec<Color> = pixels.into_iter().unique().collect();
 
         ImageKmeans {
             colors,
@@ -89,7 +89,7 @@ impl ImageKmeans {
     }
 
     /// Do a run with a fixed number of `k` clusters and return the result set to JS
-    /// as an array containing a single `RunResult`
+    /// as a single `RunResult`
     ///
     /// # Arguments
     ///
@@ -100,21 +100,14 @@ impl ImageKmeans {
 
         self.results = vec![result];
 
-        JsValue::from(
-            self.results[0]
-                .clusters
-                .iter()
-                .map(|c| format!("#{:02x}{:02x}{:02x}", c.r, c.g, c.b))
-                .map(JsValue::from)
-                .collect::<js_sys::Array>(),
-        )
+        JsValue::from_serde(&self.results[0]).unwrap()
     }
 
-    /// Performs multiple runs using `k` numbers between 1 and 10 and then uses
+    /// Performs multiple runs using `k` numbers between 1 and 20 and then uses
     /// analysis to determine the most appropriate number of `k` clusters to use
     /// for the provided image. Once determined the `RunResult` for this `k` number
     /// is returned
-    pub fn with_derrived_k_number(&mut self) -> JsValue {
+    pub fn with_derived_k_number(&mut self) -> JsValue {
         self.results = vec![];
 
         self.use_random_ks(10);
@@ -123,51 +116,45 @@ impl ImageKmeans {
             self.results.push(self.do_run(i));
         }
 
-        let points: Vec<(f32, f32)> = self.results.iter().map(|p| (p.ks as f32, p.sum)).collect();
-        let b = self.calc_euclidean_dist_2d(&points[0], &points[points.len() - 1]) as f64;
-        let mut hs = vec![];
-        // for each point in points:
-        for (i, ps) in points.iter().enumerate() {
-            if i == 0 || i == (points.len() - 1) {
-                hs.push((0, 0.0));
-            } else {
-                let a: f64 = self.calc_euclidean_dist_2d(&points[0], &ps) as f64;
-                let c: f64 = self.calc_euclidean_dist_2d(&ps, &points[points.len() - 1]) as f64;
-                let p: f64 = (a + b + c) as f64;
-                let s = p / 2.0_f64;
-                let t = f64::sqrt(s * ((s - a) * (s - b) * (s - c)));
-                let h = 2_f64 * (t / b);
-                hs.push((i, h));
-                console::log_1(&format!("{:?}", (s, t, h)).into());
-            }
+        let wcss = self.results.iter().map(|r| r.wcss).collect::<Vec<f32>>();
+
+        let (x1, y1) = (1.0, wcss[0]);
+        let (x2, y2) = (11.0, wcss[wcss.len() - 1]);
+
+        let mut distances: Vec<f32> = vec![];
+
+        for (i, sum) in wcss.iter().enumerate() {
+            let x0 = (i + 1) as f32;
+            let y0 = *sum;
+            let num = f32::abs((y2 - y1) * x0 - (x2 - x1) * y0 + x2 * y1 - y2 * x1);
+            let denum = f32::sqrt(f32::powi(y2 - y1, 2) + f32::powi(x2 - x1, 2));
+            distances.push(num / denum);
         }
 
-        console::log_1(&format!("{:?}", hs).into());
+        let max_dist = distances.iter().fold(f32::NEG_INFINITY, |a, &b| a.max(b));
+        let max_index = distances.iter().position(|&r| r == max_dist).unwrap();
 
-        let maxh = hs.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b.1));
-        let hindex = hs.iter().position(|&r| r.1 == maxh).unwrap();
-        console::log_1(&format!("hindex: {}", hindex).into());
-        //   a = calc_e_d(points[0], point)
-        //   c = calc_e_d(point, points[last])
-        //   p = a + b + c
-        //   s = p / 2
-        //   A = sqrt(s(s-a)(s-b)(s-c))
-        //   h = 2 * (A /b)
-
-        // largest H is elbow and therefore best?
-
-        console::log_1(&JsValue::from_serde(&self.results[hs[hindex].0]).unwrap());
-
-        JsValue::from_serde(&self.results[hs[hindex].0]).unwrap()
+        JsValue::from_serde(&self.results[max_index]).unwrap()
     }
 }
 
 impl ImageKmeans {
-    fn use_random_ks(&mut self, a: usize) -> () {
+    /// Take a random number of colors from the complete list of the given image
+    /// and set these as `ImageKmeans.initial_ks`
+    ///
+    /// # Arguments
+    /// * `a` - The number of random colors to pick for our initial k clusters
+    fn use_random_ks(&mut self, a: usize) {
         let rng = &mut rand::thread_rng();
         self.initial_ks = self.colors.clone().into_iter().choose_multiple(rng, a);
     }
 
+    /// Perform a 'run' of the k-means clustering arlorithm taking a specified
+    /// number of initial k colors from ImageKmeans.initial_ks
+    ///
+    /// # Arguments
+    /// * `num_ks` - How many k clusters to run the algorithm for, these will be taken [0..num_ks]
+    ///   from the ImageKmeans.initial_ks
     fn do_run(&self, num_ks: usize) -> RunResult {
         let mut iterations = 0;
         #[allow(unused_assignments)]
@@ -185,9 +172,9 @@ impl ImageKmeans {
 
             distance_shift /= new_clusters.len() as f32;
             clusters = new_clusters;
-            square_distance_sum = distance_sum; // / num_ks as f32;
+            square_distance_sum = distance_sum;
 
-            if distance_shift < 1_f32 || iterations == 10 {
+            if distance_shift < 0_f32 || iterations == 10 {
                 break;
             }
 
@@ -198,7 +185,7 @@ impl ImageKmeans {
         RunResult {
             ks: num_ks,
             clusters,
-            sum: square_distance_sum,
+            wcss: square_distance_sum,
         }
     }
 
@@ -252,11 +239,12 @@ impl ImageKmeans {
         (colors, distance_sum)
     }
 
+    /// Calculate the euclidean distance between two Color points in 3D space
+    ///
+    /// # Arguments
+    /// * `p` - first color
+    /// * `q` - second color
     fn calc_euclidean_dist(&self, p: &Color, q: &Color) -> f32 {
         f32::sqrt((i32::pow(p.r - q.r, 2) + i32::pow(p.g - q.g, 2) + i32::pow(p.b - q.b, 2)) as f32)
-    }
-
-    fn calc_euclidean_dist_2d(&self, p: &(f32, f32), q: &(f32, f32)) -> f32 {
-        f32::sqrt(f32::powi(p.0 - q.0, 2) + f32::powi(p.1 - q.1, 2))
     }
 }
