@@ -4,6 +4,7 @@ use gloo_utils::format::JsValueSerdeExt;
 use itertools::Itertools;
 use rand::seq::IteratorRandom;
 use serde_derive::{Deserialize, Serialize};
+use tsify::Tsify;
 use utils::set_panic_hook;
 use wasm_bindgen::prelude::*;
 use web_sys::CanvasRenderingContext2d;
@@ -15,7 +16,7 @@ use web_sys::CanvasRenderingContext2d;
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 /// Represents an RGB color
-#[derive(Clone, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[derive(Clone, Deserialize, Eq, Hash, PartialEq, Serialize, Tsify)]
 pub struct Color {
     r: i32,
     g: i32,
@@ -25,8 +26,9 @@ pub struct Color {
 /// Each 'run' of the cluster calculation produces a result
 /// containing the `k` size used, the vector of clusters found
 /// and the within-cluster sum of squares (WCSS)
-#[derive(Clone, Serialize)]
-struct RunResult {
+#[derive(Clone, Serialize, Deserialize, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct RunResult {
     ks: usize,
     clusters: Vec<Color>,
     wcss: f32,
@@ -54,7 +56,7 @@ impl ImageKmeans {
     /// # Arguments
     ///
     /// * `ctx` - The canvas 2d rendering context containing the image
-    /// * `width` - The width of the rendred image
+    /// * `width` - The width of the rendered image
     /// * `height` - the height of the rendered image
     #[wasm_bindgen(constructor)]
     pub fn new(ctx: &CanvasRenderingContext2d, width: u32, height: u32) -> ImageKmeans {
@@ -84,6 +86,8 @@ impl ImageKmeans {
 
     /// Returns the ResultSet from the current run to JS as an array of `RunResult`s,
     /// in the case where no run has happend yet an empty array will be returned
+    ///
+    /// @deprecated
     pub fn get_result_set(&self) -> JsValue {
         JsValue::from_serde(&self.results).unwrap()
     }
@@ -94,20 +98,21 @@ impl ImageKmeans {
     /// # Arguments
     ///
     /// * `k_number` - The number of `k` clusters to use for this run
-    pub fn with_fixed_k_number(&mut self, k_number: usize) -> JsValue {
+    pub fn with_fixed_k_number(&mut self, k_number: usize) -> RunResult {
         self.use_random_ks(k_number);
         let result = self.do_run(k_number);
 
         self.results = vec![result];
 
-        JsValue::from_serde(&self.results[0]).unwrap()
+        // JsValue::from_serde(&self.results[0]).unwrap()
+        self.results[0].clone()
     }
 
     /// Performs multiple runs using `k` numbers between 1 and 20 and then uses
     /// analysis to determine the most appropriate number of `k` clusters to use
     /// for the provided image. Once determined the `RunResult` for this `k` number
     /// is returned
-    pub fn with_derived_k_number(&mut self) -> JsValue {
+    pub fn with_derived_k_number(&mut self) -> RunResult {
         self.results = vec![];
 
         self.use_random_ks(10);
@@ -134,7 +139,8 @@ impl ImageKmeans {
         let max_dist = distances.iter().fold(f32::NEG_INFINITY, |a, &b| a.max(b));
         let max_index = distances.iter().position(|&r| r == max_dist).unwrap();
 
-        JsValue::from_serde(&self.results[max_index]).unwrap()
+        // JsValue::from_serde::<RunResult>(&self.results[max_index]).unwrap()
+        self.results[max_index].clone()
     }
 }
 
