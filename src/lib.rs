@@ -3,7 +3,7 @@ mod utils;
 use gloo_utils::format::JsValueSerdeExt;
 use itertools::Itertools;
 use rand::seq::IteratorRandom;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use tsify::Tsify;
 use utils::set_panic_hook;
 use wasm_bindgen::prelude::*;
@@ -151,7 +151,7 @@ impl ImageKmeans {
     /// # Arguments
     /// * `a` - The number of random colors to pick for our initial k clusters
     fn use_random_ks(&mut self, a: usize) {
-        let rng = &mut rand::thread_rng();
+        let rng = &mut rand::rng();
         self.initial_ks = self.colors.clone().into_iter().choose_multiple(rng, a);
     }
 

@@ -59,10 +59,14 @@ RunResult {
 
 ## Building form source
 
+> Due to changes in the getrandom crate you will either have to build with `RUSTFLAGS='--cfg getrandom_backend="wasm_js"'` or update your cargo configuration as described in [the getrandom docs](https://docs.rs/getrandom/0.3.3/getrandom/#opt-in-backends)
+
 Use [`wasm-pack`](https://rustwasm.github.io/docs/wasm-pack/introduction.html) to build the Rust source into WebAssembly, this will output the JS/Wasm into a `pkg` folder using:
 
 ```bash
-wasm-pack build
+wasm-pack build --target nodejs
+# Or if you haven't made the updates to your cargo config
+RUSTFLAGS='--cfg getrandom_backend="wasm_js"' wasm-pack build
 ```
 
 ## License
