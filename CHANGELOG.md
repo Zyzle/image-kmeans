@@ -1,5 +1,16 @@
 # Changelog
 
+## [3.0.0](https://github.com/Zyzle/image-kmeans/compare/v2.0.0...v3.0.0) (2025-09-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* add various optimizations and code fixes to improve the library ([#5](https://github.com/Zyzle/image-kmeans/issues/5))
+
+### Features
+
+* add various optimizations and code fixes to improve the library ([#5](https://github.com/Zyzle/image-kmeans/issues/5)) ([4849e9e](https://github.com/Zyzle/image-kmeans/commit/4849e9e8eb1743f7609ea701fc7db418738d8380))
+
 ## [2.0.0](https://github.com/Zyzle/image-kmeans/compare/v1.0.1...v2.0.0) (2023-02-26)
 
 
