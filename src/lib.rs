@@ -12,13 +12,16 @@ use serde::{Deserialize, Serialize};
 use tsify::Tsify;
 use utils::set_panic_hook;
 use wasm_bindgen::prelude::*;
-use web_sys::{console::log_2, CanvasRenderingContext2d};
+use web_sys::CanvasRenderingContext2d;
 
 /// Represents an RGB color
 #[derive(Clone, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Tsify)]
 pub struct Color {
+    /// The red component of the color [0-255]
     r: i32,
+    /// The green component of the color [0-255]
     g: i32,
+    /// The blue component of the color [0-255]
     b: i32,
 }
 
@@ -28,8 +31,11 @@ pub struct Color {
 #[derive(Clone, Serialize, Deserialize, Tsify)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct RunResult {
+    /// The number of `k` clusters used for this run
     ks: usize,
+    /// The cluster centroids found in this run
     clusters: Vec<Color>,
+    /// The within-cluster sum of squares for this run
     wcss: f32,
 }
 
@@ -152,15 +158,18 @@ impl ImageKmeans {
     /// * `config` - Configuration options for the run
     ///   * `quantize_fact` - An optional factor to quantize the colors by before running
     ///   * `top_num` - Only consider this number of the most frequent colors for clustering
-    #[allow(clippy::unused_async)]
+    /// # Returns
+    /// The `RunResult` for the determined optimal `k` number
+    /// # Panics
+    /// Panics if no results are found (should not happen)
+    /// or if the maximum distance calculation fails (should not happen)
+    /// when determining the optimal `k` number
+    #[allow(clippy::unused_async, clippy::cast_precision_loss)]
     pub async fn with_derived_k_number(
         &mut self,
         init_method: InitMethod,
         config: Config,
     ) -> RunResult {
-        log_2(&"Config:".into(), &format!("{:?}", config).into());
-        log_2(&"Init Method:".into(), &format!("{:?}", init_method).into());
-
         self.set_working_colors(config.quantize_fact, config.top_num);
 
         match init_method {
@@ -317,6 +326,9 @@ impl ImageKmeans {
     /// # Arguments
     /// * `num_ks` - How many k clusters to run the algorithm for, these will be taken [`0..num_ks`]
     ///   from the `ImageKmeans.initial_ks`
+    /// # Returns
+    /// The `RunResult` for this run
+    #[allow(clippy::cast_precision_loss)]
     fn do_run(&self, num_ks: usize) -> RunResult {
         let mut iterations = 0;
         #[allow(unused_assignments)]
@@ -353,6 +365,18 @@ impl ImageKmeans {
         }
     }
 
+    /// Given a set of k clusters, calculate the new clusters by assigning each color
+    /// to the nearest cluster and then recalculating the cluster centroids
+    /// # Arguments
+    /// * `k_clusters` - The current k clusters to use as centroids
+    /// # Returns
+    /// A tuple containing the new clusters and the within-cluster sum of squares
+    /// for these clusters
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_precision_loss,
+        clippy::cast_possible_wrap
+    )]
     fn calc_new_clusters(&self, k_clusters: &[Color]) -> (Vec<Color>, f32) {
         let mut new_clusters = vec![vec![]; k_clusters.len()];
 

@@ -71,21 +71,32 @@ The `Config` object used in both run types takes the following options:
 | `top_num` | only consider the top *n* number of colours by frequency in calcultions |
 
 
-
 > **Warning:** not providing either a `quantize_fact` or `top_num` configuration will result in every color in the image being used in calculations, this can take significantly longer to process on larger images with lots of colors like photographs
+
 
 ### Results object
 
 Both of the above now return a RunResult object which looks like the following:
 
-```
-RunResult {
-  ks: number;             // the number of k clusters used in this run
-  clusters: Array<Color>; // An array containing color objects
-                          // { r: number, g: number, b: number }
-                          // representing the cluster centroids
-  wcss: number            // the combined within-cluster sum of squares
-                          // for these clusters
+```ts
+/**
+ * Each \'run\' of the cluster calculation produces a result
+ * containing the `k` size used, the vector of clusters found
+ * and the within-cluster sum of squares (WCSS)
+ */
+export interface RunResult {
+    /**
+     * The number of `k` clusters used for this run
+     */
+    ks: number;
+    /**
+     * The cluster centroids found in this run
+     */
+    clusters: Color[];
+    /**
+     * The within-cluster sum of squares for this run
+     */
+    wcss: number;
 }
 ```
 
